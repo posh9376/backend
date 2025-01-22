@@ -2,7 +2,9 @@ from flask import Flask, request, jsonify
 import psycopg2
 import bcrypt
 from flask_cors import CORS
+from psycopg2 import pool
 
+# Initialize Flask app
 app = Flask(__name__)
 CORS(app)  # Enable CORS
 
@@ -15,15 +17,25 @@ db_params = {
     'port': 5432
 }
 
-# Test database connection
+# Connection Pool Setup
+db_pool = None
+
+# Function to initialize database connection pool
+def init_db_pool():
+    global db_pool
+    if db_pool is None:
+        db_pool = psycopg2.pool.SimpleConnectionPool(1, 10, **db_params)
+        print('✅ Database connection pool initialized')
+
+# Test database connection at startup
 def test_db_connection():
     try:
-        conn = psycopg2.connect(**db_params)
+        conn = db_pool.getconn()  # Get connection from the pool
         cursor = conn.cursor()
         cursor.execute('SELECT NOW()')
         print('✅ Database connected successfully')
-        
-        # Create table if not exists
+
+        # Create table if it doesn't exist
         create_table_query = '''
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
@@ -34,13 +46,15 @@ def test_db_connection():
         '''
         cursor.execute(create_table_query)
         conn.commit()
-        print('✅ Users table ready')
         cursor.close()
-        conn.close()
+        db_pool.putconn(conn)  # Return connection to the pool
+        print('✅ Users table ready')
+
     except Exception as err:
         print(f'❌ Database connection failed: {err}')
 
-# Call test_db_connection function to initialize the database
+# Call init_db_pool and test_db_connection at the app startup
+init_db_pool()
 test_db_connection()
 
 @app.route('/')
@@ -48,7 +62,7 @@ def root():
     return 'Server is running!'
 
 @app.route('/store-credentials', methods=['POST'])
-async def store_credentials():
+def store_credentials():
     data = request.get_json()
     email = data.get('email')
     password = data.get('password')
@@ -64,20 +78,22 @@ async def store_credentials():
         # Hash the password
         hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
-        # Insert user into the database
-        conn = psycopg2.connect(**db_params)
+        # Get connection from pool
+        conn = db_pool.getconn()
         cursor = conn.cursor()
 
+        # Insert user into the database
         insert_query = 'INSERT INTO users (email, password) VALUES (%s, %s) RETURNING *'
         cursor.execute(insert_query, (email, hashed_password))
         user = cursor.fetchone()
         conn.commit()
 
+        # Close cursor and return connection to pool
         cursor.close()
-        conn.close()
+        db_pool.putconn(conn)
 
         print(f'✅ User stored successfully: {user}')
-        
+
         # Send back response
         return jsonify({
             'success': True,
