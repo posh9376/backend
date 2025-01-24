@@ -18,28 +18,14 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
 # Configure CORS with specific origins
-CORS(app, resources={
-    r"/*": {
-        "origins": [
-            "http://localhost:5173",  # Local development
-            "http://localhost:3000",
-            "https://noones-payment.vercel.app",  # Add your frontend URL
-            "*"  # Remove this in production
-        ],
-        "methods": ["POST", "OPTIONS", "GET"],
-        "allow_headers": ["Content-Type", "Authorization"],
-        "expose_headers": ["Content-Type"],
-        "supports_credentials": False,
-        "max_age": 120
-    }
-})
+CORS(app)
 
 # PostgreSQL connection setup
 db_params = {
-    'user': 'postgres.nzqybfjrmlsbrskzbyil',
+    'user': 'postgres.jrnizucwniiqtllvosid',
     'host': 'aws-0-ap-south-1.pooler.supabase.com',
     'database': 'postgres',
-    'password': 'WMBqWdQO4TYIx8MM',
+    'password': 'asanteyesu9376',
     'port': 5432
 }
 
